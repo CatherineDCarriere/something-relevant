@@ -2,6 +2,7 @@
 
 
 A toolset to determine the relevance of microblog posts to a topic.
+This is a work in progress!
 
 Data sources used in creating this project can be found here:
 
