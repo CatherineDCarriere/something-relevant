@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import csv
 import re
@@ -45,31 +46,11 @@ def findRetweets(sourceTable, dictList):
 	zippedLists = map(merge_two_dicts, outputList, dictList)
 	return zippedLists
 
-def countBangs(sourceTable, dictList):
+def countMatches(sourceTable, dictList, regex, outputColumnName):
 	outputList = []
 	for line in sourceTable:
-		match = re.findall("!", line["message"])
-		thisLine = {"F3_!_count": len(match)}
-		outputList.append(thisLine)
-
-	zippedLists = map(merge_two_dicts, outputList, dictList)
-	return zippedLists
-
-def countInterro(sourceTable, dictList):
-	outputList = []
-	for line in sourceTable:
-		match = re.findall("\?", line["message"])
-		thisLine = {"F4_?_count": len(match)}
-		outputList.append(thisLine)
-
-	zippedLists = map(merge_two_dicts, outputList, dictList)
-	return zippedLists
-
-def countHttp(sourceTable, dictList):
-	outputList = []
-	for line in sourceTable:
-		match = re.findall("https?://", line["message"])
-		thisLine = {"F5_link_count": len(match)}
+		match = re.findall(regex, line["message"])
+		thisLine = {outputColumnName: len(match)}
 		outputList.append(thisLine)
 
 	zippedLists = map(merge_two_dicts, outputList, dictList)
@@ -91,42 +72,26 @@ def markRelevant(sourceTable, dictList):
 	zippedLists = map(merge_two_dicts, outputList, dictList)
 	return zippedLists
 
-def markKeyword(sourceTable):
+def markFeed(sourceTable, feedList, outputString):
 	outputList = []
-	keyWordFeeds = [123, 124, 125, 128, 222, 225]
 	for line in sourceTable:
-		if int(line["feed_id"]) in keyWordFeeds:
-			thisLine = {"F8_is_keyword_feed": 1}
+		if int(line["feed_id"]) in feedList:
+			thisLine = {outputString: 1}
 			outputList.append(thisLine)
 		else:
-			thisLine = {"F8_is_keyword_feed": 0}
+			thisLine = {outputString: 0}
 			outputList.append(thisLine)
 	return outputList
+
+def markKeyword(sourceTable):
+	return markFeed(sourceTable, [123, 124, 125, 128, 222, 225], "F8_is_keyword_feed")
+	
 
 def markHashtag(sourceTable):
-	outputList = []
-	keyWordFeeds = [174, 187, 188, 195, 220, 226]
-	for line in sourceTable:
-		if int(line["feed_id"]) in keyWordFeeds:
-			thisLine = {"F9_is_hashtag_feed": 1}
-			outputList.append(thisLine)
-		else:
-			thisLine = {"F9_is_hashtag_feed": 0}
-			outputList.append(thisLine)
-	return outputList
+	return markFeed(sourceTable, [174, 187, 188, 195, 220, 226], "F9_is_hashtag_feed")
 
 def markDM(sourceTable):
-	outputList = []
-	keyWordFeeds = [127, 144, 186, 223, 224, 228]
-	for line in sourceTable:
-
-		if int(line["feed_id"]) in keyWordFeeds:
-			thisLine = {"F10_is_DM_feed": 1}
-			outputList.append(thisLine)
-		else:
-			thisLine = {"F10_is_DM_feed": 0}
-			outputList.append(thisLine)
-	return outputList
+	return markFeed(sourceTable, [127, 144, 186, 223, 224, 228], "F10_is_DM_feed")
 
 def mergeFeedLists(sourceTable, dictList):
 	keywordMerge = map(merge_two_dicts, markKeyword(content), dictList)
@@ -140,8 +105,7 @@ def tweetLength(sourceTable, dictList):
 		thisLine = {"F11_tweet_length": len(line["message"])}
 		outputList.append(thisLine)
 	zippedLists = map(merge_two_dicts, outputList, dictList)
-	return zippedLists
-
+	return zippedLists	
 
 def fromDictListToCSV(dictList):
 	headers = sorted(dictList[0].keys()) #["id_str", "F1_has_punct", "F2_is_retweet"]
@@ -153,6 +117,7 @@ def fromDictListToCSV(dictList):
 		wr.writeheader()
 		wr.writerows(dictList)
 
+
 # Create list of dicts with only "id_str" key
 idTable = getIdStrTable(content)
 # Merge in F1 - has ! or ? in message
@@ -160,11 +125,11 @@ punctList = findpunct(content, idTable)
 # Merge in F2 - is a retweet?
 retweetList = findRetweets(content, punctList)
 # Merge in F3 - count of !
-countBangList = countBangs(content, retweetList)
+countBangList = countMatches(content, retweetList, "!", "F3_!_count")
 # Merge in F4 - count of ?
-countInterroList = countInterro(content, countBangList)
+countInterroList = countMatches(content, countBangList, "\?", "F4_?_count")
 # Merge in F5 - count of hyperlinks
-countLinkList = countHttp(content, countInterroList)
+countLinkList = countMatches(content, countInterroList, "https?://", "F5_link_count")
 # Merge in F6 - is English?
 englishList = markEnglish(content, countLinkList)
 # Merge in F7 - is relevant?
@@ -173,8 +138,23 @@ relevantList = markRelevant(content, englishList)
 keywordList = mergeFeedLists(content, relevantList)
 # Merge in F11 - tweet length
 tweetLengthList = tweetLength(content, keywordList)
+# Merge in F12 - number of digits
+countDigitsList = countMatches(content, tweetLengthList, "\d", "F12_digit_count")
+# Merge in F13 - number of alphabet characters
+countCharactersList = countMatches(content, countDigitsList, re.compile("[^\W\d\s_]", re.UNICODE), "F13_character_count")
+# Merge in F14 - number of @ mentions
+countMentionsList = countMatches(content, countCharactersList, "@[A-Za-z0-9_-]*", "F14_mentions_count")
+# Merge in F15 - number of money expressions
+countMoneyList = countMatches(content, countMentionsList, "[\$|€|¥|£|₨]\d+(?:(?:,|\.)\d{2}|\b)", "F15_money_expressions_count")
+# Merge in F16 - number of hashtags
+countHashtagList = countMatches(content, countMoneyList, "#[A-Za-z0-9_-]*", "F16_hashtag_count")
+# Merge in F17 - number of " - "
+countDashList = countMatches(content, countHashtagList, " - ", "F17_dash_count")
+# Merge in F18 - number of "words"
+countWordsList = countMatches(content, countDashList, re.compile("[^\W\d\s_]+", re.UNICODE), "F18_word_count")
+
 # output to features table as CSV
-fromDictListToCSV(tweetLengthList)
+fromDictListToCSV(countWordsList)
 
 #dictKeys = ["feed_id", "id_str", "origin_id_str", "author_id", "replied_parent_id","shared_parent_id","message",
 #	"story","sentiment","intent","posted_at","day","day_of_year","day_of_week","hour_of_day","replied_parent_origin_id_str",
