@@ -23,19 +23,17 @@ tweetData <- read.csv("400_records_18_features.csv")
 
 #predictionList: function to create models and predictions
 #using user-defined data and formula
-predictionList <- function(dat, form, n){
+predictionList <- function(dat, form){
   predList <- list()
   fitList <- list()
   testsetList <- list()
-  f <- gl(n, floor(nrow(dat)/n), length = nrow(dat))
+  f <- gl(4,nrow(dat)/4)
   dat$folds <- f
-  scoresMatrix <- matrix(nrow=floor(nrow(dat)/n), ncol=n, byrow = FALSE)
-  actualMatrix <- matrix(nrow=floor(nrow(dat)/n), ncol=n, byrow = FALSE)
-  for (k in 1:n) {
+  scoresMatrix <- matrix(nrow=100, ncol=4, byrow = FALSE)
+  actualMatrix <- matrix(nrow=100, ncol=4, byrow = FALSE)
+  for (k in 1:4) {
     train <- dat[(dat$folds != k),]
-    train <- train[1:floor(nrow(dat)/n),]
     test <- dat[(dat$folds == k),]
-    test <- test[1:floor(nrow(dat)/n),]
     fit <- lm(form, data = train)
     test$scores <- predict(fit, type = "response", newdata = test)
     scoresMatrix[,k] <- test$scores
